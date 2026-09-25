@@ -147,3 +147,258 @@ test("GET /jobs returns created jobs in newest-first order", async ({
 
   expect(createdJobs.map((job) => job.id)).toEqual([secondJob.id, firstJob.id]);
 });
+
+test("updates a job status", async ({ request }) => {
+  const created = await request.post("/jobs", {
+    data: {
+      company: "Example Company",
+      title: "Software Engineer",
+      status: "applied",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const job = await created.json();
+
+  const response = await request.patch(`/jobs/${job.id}/status`, {
+    data: {
+      status: "interview",
+      notes: "Received an interview invitation",
+    },
+  });
+
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toMatchObject({
+    id: job.id,
+    company: job.company,
+    title: job.title,
+    status: "interview",
+    created_at: job.created_at,
+  });
+});
+
+test("rejects invalid status update requests", async ({ request }) => {
+  const cases = [
+    { id: "abc", body: { status: "interview" } },
+    { id: "0", body: { status: "interview" } },
+    { id: "1", body: {} },
+    { id: "1", body: { status: "unknown" } },
+    { id: "1", body: { status: "interview", notes: 123 } },
+  ];
+
+  for (const { id, body } of cases) {
+    const response = await request.patch(`/jobs/${id}/status`, {
+      data: body,
+    });
+
+    expect(response.status()).toBe(400);
+  }
+});
+
+test("returns 404 when the job does not exist", async ({ request }) => {
+  const response = await request.patch("/jobs/9007199254740991/status", {
+    data: { status: "interview" },
+  });
+
+  expect(response.status()).toBe(404);
+  expect(await response.json()).toEqual({
+    error: "Job not found.",
+  });
+});
+
+test("returns 409 when the status is unchanged", async ({ request }) => {
+  const created = await request.post("/jobs", {
+    data: {
+      company: "Example Company",
+      title: "Software Engineer",
+      status: "applied",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const job = await created.json();
+
+  const response = await request.patch(`/jobs/${job.id}/status`, {
+    data: { status: "applied" },
+  });
+
+  expect(response.status()).toBe(409);
+  expect(await response.json()).toEqual({
+    error: "Job already has this status.",
+  });
+});
+
+test("returns job details with status history in chronological order", async ({
+  request,
+}) => {
+  const created = await request.post("/jobs", {
+    data: {
+      company: "Example Company",
+      title: "Software Engineer",
+      jd_text: "Build backend services.",
+      status: "applied",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const job = await created.json();
+
+  const updated = await request.patch(`/jobs/${job.id}/status`, {
+    data: {
+      status: "interview",
+      notes: "Received an interview invitation",
+    },
+  });
+  expect(updated.status()).toBe(200);
+  const updatedJob = await updated.json();
+
+  const response = await request.get(`/jobs/${job.id}`);
+
+  expect(response.status()).toBe(200);
+
+  const detail = await response.json();
+
+  expect(detail).toEqual({
+    ...updatedJob,
+    events: [
+      {
+        id: expect.any(Number),
+        job_id: job.id,
+        status: "applied",
+        occurred_at: job.created_at,
+        notes: "",
+        created_at: expect.any(String),
+      },
+      {
+        id: expect.any(Number),
+        job_id: job.id,
+        status: "interview",
+        occurred_at: updatedJob.updated_at,
+        notes: "Received an interview invitation",
+        created_at: expect.any(String),
+      },
+    ],
+  });
+});
+
+test("returns 404 for a missing job detail", async ({ request }) => {
+  const response = await request.get("/jobs/9007199254740991");
+
+  expect(response.status()).toBe(404);
+  expect(await response.json()).toEqual({
+    error: "Job not found.",
+  });
+});
+
+test("rejects invalid job detail IDs", async ({ request }) => {
+  for (const id of ["abc", "0", "-1", "1.5"]) {
+    const response = await request.get(`/jobs/${id}`);
+
+    expect(response.status()).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "Invalid job ID.",
+    });
+  }
+});
+
+test("updates provided job fields and preserves status history", async ({
+  request,
+}) => {
+  const created = await request.post("/jobs", {
+    data: {
+      company: "Original Company",
+      title: "Software Engineer",
+      jd_text: "Build backend services.",
+      status: "applied",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const job = await created.json();
+
+  const beforeResponse = await request.get(`/jobs/${job.id}`);
+  expect(beforeResponse.status()).toBe(200);
+  const before = await beforeResponse.json();
+
+  const response = await request.patch(`/jobs/${job.id}`, {
+    data: { company: "  Updated Company  " },
+  });
+
+  expect(response.status()).toBe(200);
+  const updated = await response.json();
+
+  expect(updated).toEqual({
+    ...job,
+    company: "Updated Company",
+    updated_at: expect.any(String),
+  });
+
+  const afterResponse = await request.get(`/jobs/${job.id}`);
+  expect(afterResponse.status()).toBe(200);
+
+  expect(await afterResponse.json()).toEqual({
+    ...updated,
+    events: before.events,
+  });
+});
+
+test("updates the job title and allows clearing the JD", async ({
+  request,
+}) => {
+  const created = await request.post("/jobs", {
+    data: {
+      company: "Example Company",
+      title: "Software Engineer",
+      jd_text: "Original description.",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const job = await created.json();
+
+  const response = await request.patch(`/jobs/${job.id}`, {
+    data: {
+      title: "  Backend Engineer  ",
+      jd_text: "",
+    },
+  });
+
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toMatchObject({
+    id: job.id,
+    company: job.company,
+    title: "Backend Engineer",
+    jd_text: "",
+    status: job.status,
+  });
+});
+
+test("rejects invalid job edits", async ({ request }) => {
+  const cases = [
+    { id: "abc", body: { company: "Example Company" } },
+    { id: "1", body: {} },
+    { id: "1", body: { company: "   " } },
+    { id: "1", body: { title: "" } },
+    { id: "1", body: { jd_text: 123 } },
+    { id: "1", body: { company: null } },
+    { id: "1", body: { status: "offer" } },
+    {
+      id: "1",
+      body: { company: "Example Company", status: "offer" },
+    },
+  ];
+
+  for (const { id, body } of cases) {
+    const response = await request.patch(`/jobs/${id}`, {
+      data: body,
+    });
+
+    expect(response.status()).toBe(400);
+  }
+});
+
+test("returns 404 when editing a missing job", async ({ request }) => {
+  const response = await request.patch("/jobs/9007199254740991", {
+    data: { company: "Updated Company" },
+  });
+
+  expect(response.status()).toBe(404);
+  expect(await response.json()).toEqual({
+    error: "Job not found.",
+  });
+});
