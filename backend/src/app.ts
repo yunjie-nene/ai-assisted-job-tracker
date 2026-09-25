@@ -1,7 +1,7 @@
 import express, { type ErrorRequestHandler } from "express";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { createJob } from "./repositories/jobs.js";
+import { createJob, listJobs } from "./repositories/jobs.js";
 
 const createJobSchema = z.object({
   company: z.string().trim().min(1),
@@ -19,6 +19,11 @@ export function createApp(db: Database.Database) {
 
   app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
+  });
+
+  app.get("/jobs", (_req, res) => {
+    const jobs = listJobs(db);
+    res.status(200).json(jobs);
   });
 
   app.post("/jobs", (req, res) => {
