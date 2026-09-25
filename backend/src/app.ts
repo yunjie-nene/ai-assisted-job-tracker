@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler } from "express";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { createInterviewsRouter } from "./routes/interviews.js";
 import {
   createJob,
   getJobDetail,
@@ -156,6 +157,8 @@ export function createApp(db: Database.Database) {
 
     res.status(200).json(job);
   });
+
+  app.use(createInterviewsRouter(db));
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     if (error?.type === "entity.parse.failed") {
