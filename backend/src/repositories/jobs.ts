@@ -130,3 +130,49 @@ export function updateJobStatus(
 
   return update();
 }
+
+export interface JobEvent {
+  id: number;
+  job_id: number;
+  status: JobStatus;
+  occurred_at: string;
+  notes: string;
+  created_at: string;
+}
+
+export interface JobDetail extends Job {
+  events: JobEvent[];
+}
+
+export function getJobDetail(
+  db: Database.Database,
+  jobId: number,
+): JobDetail | undefined {
+  const job = db
+    .prepare(
+      `
+    SELECT id, company, title, jd_text, status,
+           created_at, updated_at
+    FROM Jobs
+    WHERE id = ?
+  `,
+    )
+    .get(jobId) as Job | undefined;
+
+  if (!job) {
+    return undefined;
+  }
+
+  const events = db
+    .prepare(
+      `
+    SELECT id, job_id, status, occurred_at, notes, created_at
+    FROM Job_Events
+    WHERE job_id = ?
+    ORDER BY occurred_at ASC, id ASC
+  `,
+    )
+    .all(jobId) as JobEvent[];
+
+  return { ...job, events };
+}

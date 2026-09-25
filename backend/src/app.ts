@@ -1,7 +1,12 @@
 import express, { type ErrorRequestHandler } from "express";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { createJob, listJobs, updateJobStatus } from "./repositories/jobs.js";
+import {
+  createJob,
+  getJobDetail,
+  listJobs,
+  updateJobStatus,
+} from "./repositories/jobs.js";
 
 const createJobSchema = z.object({
   company: z.string().trim().min(1),
@@ -42,6 +47,24 @@ export function createApp(db: Database.Database) {
   app.get("/jobs", (_req, res) => {
     const jobs = listJobs(db);
     res.status(200).json(jobs);
+  });
+
+  app.get("/jobs/:id", (req, res) => {
+    const idResult = jobIdSchema.safeParse(req.params.id);
+
+    if (!idResult.success) {
+      res.status(400).json({ error: "Invalid job ID." });
+      return;
+    }
+
+    const job = getJobDetail(db, idResult.data);
+
+    if (!job) {
+      res.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    res.status(200).json(job);
   });
 
   app.post("/jobs", (req, res) => {

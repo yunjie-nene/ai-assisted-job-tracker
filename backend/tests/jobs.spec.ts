@@ -162,7 +162,7 @@ test("updates a job status", async ({ request }) => {
   const response = await request.patch(`/jobs/${job.id}/status`, {
     data: {
       status: "interview",
-      notes: "收到面试邀请",
+      notes: "Received an interview invitation",
     },
   });
 
@@ -224,4 +224,76 @@ test("returns 409 when the status is unchanged", async ({ request }) => {
   expect(await response.json()).toEqual({
     error: "Job already has this status.",
   });
+});
+
+test("returns job details with status history in chronological order", async ({
+  request,
+}) => {
+  const created = await request.post("/jobs", {
+    data: {
+      company: "Example Company",
+      title: "Software Engineer",
+      jd_text: "Build backend services.",
+      status: "applied",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const job = await created.json();
+
+  const updated = await request.patch(`/jobs/${job.id}/status`, {
+    data: {
+      status: "interview",
+      notes: "Received an interview invitation",
+    },
+  });
+  expect(updated.status()).toBe(200);
+  const updatedJob = await updated.json();
+
+  const response = await request.get(`/jobs/${job.id}`);
+
+  expect(response.status()).toBe(200);
+
+  const detail = await response.json();
+
+  expect(detail).toEqual({
+    ...updatedJob,
+    events: [
+      {
+        id: expect.any(Number),
+        job_id: job.id,
+        status: "applied",
+        occurred_at: job.created_at,
+        notes: "",
+        created_at: expect.any(String),
+      },
+      {
+        id: expect.any(Number),
+        job_id: job.id,
+        status: "interview",
+        occurred_at: updatedJob.updated_at,
+        notes: "Received an interview invitation",
+        created_at: expect.any(String),
+      },
+    ],
+  });
+});
+
+test("returns 404 for a missing job detail", async ({ request }) => {
+  const response = await request.get("/jobs/9007199254740991");
+
+  expect(response.status()).toBe(404);
+  expect(await response.json()).toEqual({
+    error: "Job not found.",
+  });
+});
+
+test("rejects invalid job detail IDs", async ({ request }) => {
+  for (const id of ["abc", "0", "-1", "1.5"]) {
+    const response = await request.get(`/jobs/${id}`);
+
+    expect(response.status()).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "Invalid job ID.",
+    });
+  }
 });
