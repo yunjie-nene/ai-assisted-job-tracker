@@ -1,7 +1,7 @@
 import express, { type ErrorRequestHandler } from "express";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { createJob, listJobs } from "./repositories/jobs.js";
+import { createJob, listJobs, updateJobStatus } from "./repositories/jobs.js";
 
 const createJobSchema = z.object({
   company: z.string().trim().min(1),
@@ -10,6 +10,24 @@ const createJobSchema = z.object({
   status: z
     .enum(["saved", "applied", "interview", "offer", "rejected", "withdrawn"])
     .default("saved"),
+});
+
+const jobIdSchema = z.coerce
+  .number()
+  .int()
+  .positive()
+  .max(Number.MAX_SAFE_INTEGER);
+
+const updateJobStatusSchema = z.object({
+  status: z.enum([
+    "saved",
+    "applied",
+    "interview",
+    "offer",
+    "rejected",
+    "withdrawn",
+  ]),
+  notes: z.string().trim().default(""),
 });
 
 export function createApp(db: Database.Database) {
@@ -39,6 +57,41 @@ export function createApp(db: Database.Database) {
 
     const job = createJob(db, result.data);
     res.status(201).json(job);
+  });
+
+  app.patch("/jobs/:id/status", (req, res) => {
+    const idResult = jobIdSchema.safeParse(req.params.id);
+
+    if (!idResult.success) {
+      res.status(400).json({ error: "Invalid job ID." });
+      return;
+    }
+
+    const bodyResult = updateJobStatusSchema.safeParse(req.body);
+
+    if (!bodyResult.success) {
+      res.status(400).json({
+        error: "Invalid request body.",
+        issues: bodyResult.error.issues,
+      });
+      return;
+    }
+
+    const result = updateJobStatus(db, idResult.data, bodyResult.data);
+
+    if (result.kind === "not_found") {
+      res.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    if (result.kind === "unchanged") {
+      res.status(409).json({
+        error: "Job already has this status.",
+      });
+      return;
+    }
+
+    res.status(200).json(result.job);
   });
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {

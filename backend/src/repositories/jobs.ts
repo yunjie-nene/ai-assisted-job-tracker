@@ -68,3 +68,65 @@ export function listJobs(db: Database.Database): Job[] {
     )
     .all() as Job[];
 }
+
+export interface UpdateJobStatusInput {
+  status: JobStatus;
+  notes?: string;
+}
+
+export type UpdateJobStatusResult =
+  | { kind: "updated"; job: Job }
+  | { kind: "not_found" }
+  | { kind: "unchanged" };
+
+export function updateJobStatus(
+  db: Database.Database,
+  jobId: number,
+  input: UpdateJobStatusInput,
+): UpdateJobStatusResult {
+  const update = db.transaction((): UpdateJobStatusResult => {
+    const existingJob = db
+      .prepare(
+        `
+      SELECT id, company, title, jd_text, status,
+             created_at, updated_at
+      FROM Jobs
+      WHERE id = ?
+    `,
+      )
+      .get(jobId) as Job | undefined;
+
+    if (!existingJob) {
+      return { kind: "not_found" };
+    }
+
+    if (existingJob.status === input.status) {
+      return { kind: "unchanged" };
+    }
+
+    const now = new Date().toISOString();
+
+    const updatedJob = db
+      .prepare(
+        `
+      UPDATE Jobs
+      SET status = ?, updated_at = ?
+      WHERE id = ?
+      RETURNING id, company, title, jd_text, status,
+                created_at, updated_at
+    `,
+      )
+      .get(input.status, now, jobId) as Job;
+
+    db.prepare(
+      `
+      INSERT INTO Job_Events (job_id, status, occurred_at, notes)
+      VALUES (?, ?, ?, ?)
+    `,
+    ).run(jobId, input.status, now, input.notes ?? "");
+
+    return { kind: "updated", job: updatedJob };
+  });
+
+  return update();
+}

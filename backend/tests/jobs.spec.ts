@@ -147,3 +147,81 @@ test("GET /jobs returns created jobs in newest-first order", async ({
 
   expect(createdJobs.map((job) => job.id)).toEqual([secondJob.id, firstJob.id]);
 });
+
+test("updates a job status", async ({ request }) => {
+  const created = await request.post("/jobs", {
+    data: {
+      company: "Example Company",
+      title: "Software Engineer",
+      status: "applied",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const job = await created.json();
+
+  const response = await request.patch(`/jobs/${job.id}/status`, {
+    data: {
+      status: "interview",
+      notes: "收到面试邀请",
+    },
+  });
+
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toMatchObject({
+    id: job.id,
+    company: job.company,
+    title: job.title,
+    status: "interview",
+    created_at: job.created_at,
+  });
+});
+
+test("rejects invalid status update requests", async ({ request }) => {
+  const cases = [
+    { id: "abc", body: { status: "interview" } },
+    { id: "0", body: { status: "interview" } },
+    { id: "1", body: {} },
+    { id: "1", body: { status: "unknown" } },
+    { id: "1", body: { status: "interview", notes: 123 } },
+  ];
+
+  for (const { id, body } of cases) {
+    const response = await request.patch(`/jobs/${id}/status`, {
+      data: body,
+    });
+
+    expect(response.status()).toBe(400);
+  }
+});
+
+test("returns 404 when the job does not exist", async ({ request }) => {
+  const response = await request.patch("/jobs/9007199254740991/status", {
+    data: { status: "interview" },
+  });
+
+  expect(response.status()).toBe(404);
+  expect(await response.json()).toEqual({
+    error: "Job not found.",
+  });
+});
+
+test("returns 409 when the status is unchanged", async ({ request }) => {
+  const created = await request.post("/jobs", {
+    data: {
+      company: "Example Company",
+      title: "Software Engineer",
+      status: "applied",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const job = await created.json();
+
+  const response = await request.patch(`/jobs/${job.id}/status`, {
+    data: { status: "applied" },
+  });
+
+  expect(response.status()).toBe(409);
+  expect(await response.json()).toEqual({
+    error: "Job already has this status.",
+  });
+});
