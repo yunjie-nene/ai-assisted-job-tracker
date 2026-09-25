@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { parseJobDescription } from "../services/job-parser.js";
+import { AiTimeoutError, parseJobDescription } from "../services/job-parser.js";
 
 const parseJobRequestSchema = z
   .object({
@@ -27,7 +27,14 @@ export function createAiRouter(
     try {
       const job = await parseJob(body.data.jd_text);
       res.status(200).json(job);
-    } catch {
+    } catch (error) {
+      if (error instanceof AiTimeoutError) {
+        res.status(504).json({
+          error: "AI parsing timed out. Please try again.",
+        });
+        return;
+      }
+
       res.status(502).json({
         error: "Unable to parse the job description. Please try again later.",
       });

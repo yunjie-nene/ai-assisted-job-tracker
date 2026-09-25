@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import { createAiRouter } from "../src/routes/ai.js";
-import type { ParsedJob } from "../src/services/job-parser.js";
+import { AiTimeoutError, type ParsedJob } from "../src/services/job-parser.js";
 
 type JobParser = (jdText: string) => Promise<ParsedJob>;
 
@@ -133,5 +133,24 @@ test("the main application mounts the AI route", async ({ request }) => {
   expect(await response.json()).toMatchObject({
     error: "Invalid request body.",
     issues: expect.any(Array),
+  });
+});
+
+test("returns 504 when AI parsing times out", async ({ request }) => {
+  const fakeParser: JobParser = async () => {
+    throw new AiTimeoutError();
+  };
+
+  await withAiServer(fakeParser, async (baseURL) => {
+    const response = await request.post(`${baseURL}/ai/parse-job`, {
+      data: {
+        jd_text: "Example Company is hiring a Backend Engineer.",
+      },
+    });
+
+    expect(response.status()).toBe(504);
+    expect(await response.json()).toEqual({
+      error: "AI parsing timed out. Please try again.",
+    });
   });
 });

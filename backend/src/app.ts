@@ -176,8 +176,8 @@ export function createApp(db: Database.Database) {
     res.status(500).json({ error: "Internal server error." });
   };
 
-  app.use(errorHandler);
   app.use(createAiRouter());
+  app.use(errorHandler);
 
   return app;
 }
