@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { Job } from "../src/repositories/jobs.js";
 
 test("POST /jobs creates an application", async ({ request }) => {
   const response = await request.post("/jobs", {
@@ -96,3 +97,53 @@ for (const example of invalidCases) {
     );
   });
 }
+
+test("GET /jobs returns created jobs in newest-first order", async ({
+  request,
+}) => {
+  const firstResponse = await request.post("/jobs", {
+    data: {
+      company: "List Test Company",
+      title: "First Position",
+    },
+  });
+
+  expect(firstResponse.status()).toBe(201);
+  const firstJob: Job = await firstResponse.json();
+
+  const secondResponse = await request.post("/jobs", {
+    data: {
+      company: "List Test Company",
+      title: "Second Position",
+    },
+  });
+
+  expect(secondResponse.status()).toBe(201);
+  const secondJob: Job = await secondResponse.json();
+
+  const response = await request.get("/jobs");
+
+  expect(response.status()).toBe(200);
+
+  const jobs: Job[] = await response.json();
+
+  expect(jobs).toEqual(expect.any(Array));
+  expect(jobs).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: firstJob.id,
+        title: "First Position",
+      }),
+      expect.objectContaining({
+        id: secondJob.id,
+        title: "Second Position",
+      }),
+    ]),
+  );
+
+  const createdJobs = jobs.filter(
+    (job) => job.id === firstJob.id || job.id === secondJob.id,
+  );
+
+  expect(createdJobs.map((job) => job.id)).toEqual([secondJob.id, firstJob.id]);
+});

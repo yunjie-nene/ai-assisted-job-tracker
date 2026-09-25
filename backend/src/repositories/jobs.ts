@@ -55,3 +55,16 @@ export function createJob(db: Database.Database, input: CreateJobInput): Job {
 
   return create();
 }
+
+export function listJobs(db: Database.Database): Job[] {
+  return db
+    .prepare(
+      `
+    SELECT id, company, title, jd_text, status,
+           created_at, updated_at
+    FROM Jobs
+    ORDER BY created_at DESC, id DESC
+  `,
+    )
+    .all() as Job[];
+}
