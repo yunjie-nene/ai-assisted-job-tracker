@@ -9,6 +9,7 @@ import {
   updateJob,
   updateJobStatus,
 } from "./repositories/jobs.js";
+import { createAiRouter } from "./routes/ai.js";
 
 const createJobSchema = z.object({
   company: z.string().trim().min(1),
@@ -176,6 +177,7 @@ export function createApp(db: Database.Database) {
   };
 
   app.use(errorHandler);
+  app.use(createAiRouter());
 
   return app;
 }
