@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import {
   createInterview,
+  deleteInterview,
   listInterviews,
   updateInterview,
 } from "../repositories/interviews.js";
@@ -98,6 +99,21 @@ export function createInterviewsRouter(db: Database.Database) {
     }
 
     res.status(200).json(interview);
+  });
+
+  router.delete("/interviews/:id", (req, res) => {
+    const id = idSchema.safeParse(req.params.id);
+    if (!id.success) {
+      res.status(400).json({ error: "Invalid interview ID." });
+      return;
+    }
+
+    if (!deleteInterview(db, id.data)) {
+      res.status(404).json({ error: "Interview not found." });
+      return;
+    }
+
+    res.status(204).end();
   });
 
   return router;

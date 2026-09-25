@@ -209,3 +209,13 @@ export function updateJob(
       jobId,
     ) as Job | undefined;
 }
+
+export function deleteJob(db: Database.Database, jobId: number): boolean {
+  const remove = db.transaction(() => {
+    db.prepare("DELETE FROM Interviews WHERE job_id = ?").run(jobId);
+    db.prepare("DELETE FROM Job_Events WHERE job_id = ?").run(jobId);
+    return db.prepare("DELETE FROM Jobs WHERE id = ?").run(jobId).changes > 0;
+  });
+
+  return remove();
+}

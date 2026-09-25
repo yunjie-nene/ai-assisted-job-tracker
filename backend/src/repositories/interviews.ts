@@ -99,3 +99,7 @@ export function updateInterview(
 
   return row ? toInterview(row) : undefined;
 }
+
+export function deleteInterview(db: Database.Database, interviewId: number): boolean {
+  return db.prepare("DELETE FROM Interviews WHERE id = ?").run(interviewId).changes > 0;
+}

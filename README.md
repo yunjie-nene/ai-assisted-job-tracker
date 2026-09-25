@@ -47,3 +47,13 @@ Invalid IDs or request bodies return `400`; missing jobs or interviews return
 
 Run backend checks from `backend/`: `npm run typecheck` and `npm test`.
 The test command builds the backend and starts an isolated in-memory test server.
+
+## Deletion API
+
+- `DELETE /interviews/:id`: permanently delete one interview, preserving the job and its status history.
+- `DELETE /jobs/:id`: permanently delete a job and its interviews and status events in one transaction. If any deletion fails, all changes are rolled back.
+
+Both return `204` with no response body on success, `404` if the record does not
+exist (including repeated deletion), and `400` for an invalid ID. Use the job
+status `withdrawn` to retain the history of a withdrawn application instead of
+deleting it.

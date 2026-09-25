@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createInterviewsRouter } from "./routes/interviews.js";
 import {
   createJob,
+  deleteJob,
   getJobDetail,
   listJobs,
   updateJob,
@@ -157,6 +158,21 @@ export function createApp(db: Database.Database) {
     }
 
     res.status(200).json(job);
+  });
+
+  app.delete("/jobs/:id", (req, res) => {
+    const id = jobIdSchema.safeParse(req.params.id);
+    if (!id.success) {
+      res.status(400).json({ error: "Invalid job ID." });
+      return;
+    }
+
+    if (!deleteJob(db, id.data)) {
+      res.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    res.status(204).end();
   });
 
   app.use(createInterviewsRouter(db));
