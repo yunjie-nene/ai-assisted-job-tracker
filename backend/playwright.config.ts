@@ -17,6 +17,7 @@ export default defineConfig({
     url: `${baseURL}/health`,
     env: {
       PORT: "3100",
+      DATABASE_PATH: ":memory:",
     },
     reuseExistingServer: false,
     timeout: 60_000,
