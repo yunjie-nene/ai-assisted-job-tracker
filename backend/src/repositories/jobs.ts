@@ -176,3 +176,36 @@ export function getJobDetail(
 
   return { ...job, events };
 }
+
+export interface UpdateJobInput {
+  company?: string;
+  title?: string;
+  jd_text?: string;
+}
+
+export function updateJob(
+  db: Database.Database,
+  jobId: number,
+  input: UpdateJobInput,
+): Job | undefined {
+  return db
+    .prepare(
+      `
+    UPDATE Jobs
+    SET company = COALESCE(?, company),
+        title = COALESCE(?, title),
+        jd_text = COALESCE(?, jd_text),
+        updated_at = ?
+    WHERE id = ?
+    RETURNING id, company, title, jd_text, status,
+              created_at, updated_at
+  `,
+    )
+    .get(
+      input.company ?? null,
+      input.title ?? null,
+      input.jd_text ?? null,
+      new Date().toISOString(),
+      jobId,
+    ) as Job | undefined;
+}

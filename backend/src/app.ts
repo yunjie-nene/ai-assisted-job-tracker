@@ -5,6 +5,7 @@ import {
   createJob,
   getJobDetail,
   listJobs,
+  updateJob,
   updateJobStatus,
 } from "./repositories/jobs.js";
 
@@ -34,6 +35,17 @@ const updateJobStatusSchema = z.object({
   ]),
   notes: z.string().trim().default(""),
 });
+
+const updateJobSchema = z
+  .object({
+    company: z.string().trim().min(1).optional(),
+    title: z.string().trim().min(1).optional(),
+    jd_text: z.string().optional(),
+  })
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "Provide at least one field to update.",
+  });
 
 export function createApp(db: Database.Database) {
   const app = express();
@@ -115,6 +127,34 @@ export function createApp(db: Database.Database) {
     }
 
     res.status(200).json(result.job);
+  });
+
+  app.patch("/jobs/:id", (req, res) => {
+    const idResult = jobIdSchema.safeParse(req.params.id);
+
+    if (!idResult.success) {
+      res.status(400).json({ error: "Invalid job ID." });
+      return;
+    }
+
+    const bodyResult = updateJobSchema.safeParse(req.body);
+
+    if (!bodyResult.success) {
+      res.status(400).json({
+        error: "Invalid request body.",
+        issues: bodyResult.error.issues,
+      });
+      return;
+    }
+
+    const job = updateJob(db, idResult.data, bodyResult.data);
+
+    if (!job) {
+      res.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    res.status(200).json(job);
   });
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
