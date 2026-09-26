@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://api.job-tracker.invalid/:path*"
+      "destination": "https://nora-job-tracker-api.duckdns.org/:path*"
     }
   ],
   "headers": [
