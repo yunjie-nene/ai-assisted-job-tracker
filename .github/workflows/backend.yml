@@ -1,10 +1,11 @@
-name: Backend CI
+name: Backend CI/CD
 
 on:
   pull_request:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,8 +36,61 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check deployment scripts
+        working-directory: .
+        run: |
+          bash -n deploy/deploy-backend.sh
+          python3 -m unittest discover -s deploy/tests -v
+
       - name: Check TypeScript
         run: npm run typecheck
 
       - name: Build and test API
+        env:
+          DOTENV_CONFIG_PATH: /dev/null
         run: npm test
+
+  deploy:
+    name: Deploy backend to EC2
+    needs: backend-checks
+    if: >-
+      github.repository == 'yunjie-nene/ai-assisted-job-tracker' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: job-tracker-backend-production
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      AWS_PAGER: ''
+    steps:
+      - name: Check out the tested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Validate deployment variables
+        run: |
+          test -n "$AWS_REGION"
+          test -n "$AWS_ROLE_ARN"
+          test -n "$EC2_INSTANCE_ID"
+
+      - name: Authenticate to AWS with OIDC
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: job-tracker-${{ github.run_id }}
+          role-duration-seconds: 1800
+          allowed-account-ids: '549499517933'
+
+      - name: Deploy and verify through SSM
+        run: python3 deploy/run-ssm-deploy.py
