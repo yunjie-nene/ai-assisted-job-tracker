@@ -36,6 +36,7 @@ jobs:
         run: |
           npm run typecheck
           npm run lint
+          npm run test:config
           npm run build
       - name: Install Chromium
         working-directory: frontend
