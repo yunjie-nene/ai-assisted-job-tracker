@@ -1,0 +1,10 @@
+# Bootstrap only. Keep the API inaccessible until HTTPS is configured.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api.example.com;
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+    location / { return 404; }
+}

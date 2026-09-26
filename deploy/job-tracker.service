@@ -1,0 +1,28 @@
+[Unit]
+Description=Job Tracker API
+After=network.target
+
+[Service]
+Type=simple
+User=jobtracker
+Group=jobtracker
+WorkingDirectory=/opt/job-tracker/current/backend
+Environment=NODE_ENV=production
+Environment=DOTENV_CONFIG_PATH=/dev/null
+EnvironmentFile=/etc/job-tracker/backend.env
+ExecStart=/usr/local/bin/node dist/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+UMask=0077
+StateDirectory=job-tracker
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/job-tracker
+
+[Install]
+WantedBy=multi-user.target

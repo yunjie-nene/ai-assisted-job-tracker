@@ -1,59 +1,78 @@
 # AI-Assisted Job Tracker
 
-A personal job application tracker with flexible interview
-timelines and AI-powered insights.
+A personal job application tracker with a React frontend, an Express API,
+and AI-assisted job description parsing.
 
-## Planned Features
+## Features
 
-- Track job applications and status changes
-- Manage interviews with different rounds and types
-- View application and interview timelines
-- Extract key skills from job descriptions using Google Gemini
-- Summarize application history and suggest improvements
+- Create, edit, search, filter, and delete job applications.
+- Track application statuses and their history.
+- Manage interview rounds, schedules, outcomes, and notes.
+- Extract company, role, and skills from job descriptions using Gemini.
+- Review AI suggestions before saving an application.
+- Use the workspace on desktop and mobile.
 
-## Planned Tech Stack
+Extracted skills are currently a preview only and are not saved separately.
+Interview updates do not automatically change the application status.
 
-- Frontend: React + TypeScript
-- Backend: Node.js + TypeScript + Express
-- Database: SQLite
-- AI: Google Gemini API
-- Testing: Playwright
-- CI/CD: GitHub Actions
-- Hosting: AWS EC2 + Vercel
+## Tech Stack
+
+| Layer | Technologies |
+| --- | --- |
+| Frontend | React, TypeScript, Vite |
+| Backend | Node.js, TypeScript, Express |
+| Database | SQLite |
+| AI | Google Gemini |
+| Testing | Playwright |
+| CI | GitHub Actions |
+| Planned deployment | Vercel, AWS EC2, Nginx |
+
+## Run Locally
+
+Use Node.js 24. From the repository root, install dependencies:
+
+```bash
+nvm use
+npm ci --prefix backend
+npm ci --prefix frontend
+```
+
+Start the backend in one terminal:
+
+```bash
+cd backend
+npm run dev
+```
+
+Start the frontend in another terminal, from the repository root:
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open http://localhost:5173. The frontend forwards API requests to
+http://localhost:3000.
+
+Configure `GEMINI_API_KEY` in `backend/.env` to enable AI extraction.
+Manual application management works without it. Keep API keys on the backend.
+
+## Project Structure
+
+```text
+backend/             Express API, SQLite database code, and API tests
+frontend/            React application and browser tests
+deploy/              Server and reverse-proxy configuration
+docs/                Deployment documentation
+.github/workflows/   Backend and frontend CI
+```
+
+## Documentation
+
+- [Frontend development and testing](frontend/README.md)
+- [Deployment guide](docs/DEPLOYMENT.md)
 
 ## Status
 
-Backend job creation, listing, details, status history, editing, and interview management are implemented. Frontend and AI features are planned.
-
-## Interview API
-
-- `POST /jobs/:id/interviews`: create an interview; only `title` is required.
-- `GET /jobs/:id/interviews`: list interviews by scheduled time ascending, then ID; unscheduled interviews come last. An existing job with no interviews returns `[]`.
-- `PATCH /interviews/:id`: update one or more interview fields; omitted fields are preserved.
-
-Writable fields: `title`, `types` (an array of nonblank custom strings),
-`scheduled_at` (an ISO 8601 timestamp with a timezone, or `null`), `status`,
-`outcome`, and `notes`. Timestamps are normalized to UTC. Pass
-`scheduled_at: null`, `types: []`, or `notes: ""` to clear those fields.
-
-The default status is `pending`; accepted values are `pending`, `scheduled`,
-`completed`, and `cancelled`. The default outcome is `pending`; accepted values
-are `pending`, `passed`, and `failed`. Status, outcome, and scheduled time are
-edited explicitly and independently. Interview changes do not change the job's
-status or add job status events.
-
-Invalid IDs or request bodies return `400`; missing jobs or interviews return
-`404`. Unknown body fields and empty PATCH bodies are rejected.
-
-Run backend checks from `backend/`: `npm run typecheck` and `npm test`.
-The test command builds the backend and starts an isolated in-memory test server.
-
-## Deletion API
-
-- `DELETE /interviews/:id`: permanently delete one interview, preserving the job and its status history.
-- `DELETE /jobs/:id`: permanently delete a job and its interviews and status events in one transaction. If any deletion fails, all changes are rolled back.
-
-Both return `204` with no response body on success, `404` if the record does not
-exist (including repeated deletion), and `400` for an invalid ID. Use the job
-status `withdrawn` to retain the history of a withdrawn application instead of
-deleting it.
+The frontend and backend MVP are implemented and locally tested.
+Deployment configuration is prepared; public deployment is pending.
